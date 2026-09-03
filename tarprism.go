@@ -1,6 +1,9 @@
 // Package tarprism splits an uncompressed tar archive into a recipe (every
 // byte that is not regular-file content, kept verbatim) and numbered blobs
 // (the file contents), and reassembles the byte-identical archive from them.
+//
+// The parts can live in a prism directory (Decompose, Compose) or wherever a
+// Sink and Source put them (DecomposeTo, ComposeFrom).
 package tarprism
 
 import (
@@ -49,6 +52,11 @@ func ReadIndex(dir string) (*Index, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading index: %w", err)
 	}
+	return DecodeIndex(data)
+}
+
+// DecodeIndex parses and validates the content of a recipe.json.
+func DecodeIndex(data []byte) (*Index, error) {
 	var idx Index
 	if err := json.Unmarshal(data, &idx); err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", IndexFile, err)
@@ -57,6 +65,16 @@ func ReadIndex(dir string) (*Index, error) {
 		return nil, fmt.Errorf("invalid %s: %w", IndexFile, err)
 	}
 	return &idx, nil
+}
+
+// EncodeIndex renders idx exactly as Decompose writes recipe.json: indented
+// JSON followed by a newline.
+func EncodeIndex(idx *Index) ([]byte, error) {
+	data, err := json.MarshalIndent(idx, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("encoding index: %w", err)
+	}
+	return append(data, '\n'), nil
 }
 
 func (idx *Index) validate() error {
@@ -82,11 +100,11 @@ func (idx *Index) validate() error {
 }
 
 func writeIndex(dir string, idx *Index) error {
-	data, err := json.MarshalIndent(idx, "", "  ")
+	data, err := EncodeIndex(idx)
 	if err != nil {
-		return fmt.Errorf("encoding index: %w", err)
+		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, IndexFile), append(data, '\n'), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, IndexFile), data, 0o644); err != nil {
 		return fmt.Errorf("writing index: %w", err)
 	}
 	return nil
