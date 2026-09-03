@@ -7,7 +7,21 @@ import (
 	"testing"
 )
 
-func TestRoundTripFixtures(t *testing.T) {
+// archiveFixture is a hand-built archive with the blobs it must yield.
+type archiveFixture struct {
+	name     string
+	archive  []byte
+	names    []string
+	contents [][]byte
+	offsets  []int64
+}
+
+// archiveFixtures returns hand-built block sequences covering GNU sparse
+// entries, bogus header-only sizes, PAX overrides, long names, base-256
+// sizes, unknown typeflags, and archive tails. Every round-trip path (the
+// directory adapters and memory sinks and sources) is tested over all of
+// them.
+func archiveFixtures() []archiveFixture {
 	gnu := "ustar  \x00"
 	posix := "ustar\x0000"
 	regB := rawHeader{name: "b", typeflag: '0', size: 3, magic: posix}.block()
@@ -20,13 +34,7 @@ func TestRoundTripFixtures(t *testing.T) {
 	base256Three := append([]byte{0x80}, make([]byte, 11)...)
 	base256Three[11] = 3
 
-	fixtures := []struct {
-		name     string
-		archive  []byte
-		names    []string
-		contents [][]byte
-		offsets  []int64
-	}{
+	return []archiveFixture{
 		{
 			name: "old gnu sparse with extension block",
 			archive: concat(
@@ -148,19 +156,28 @@ func TestRoundTripFixtures(t *testing.T) {
 			archive: nil,
 		},
 	}
-	for _, fx := range fixtures {
+}
+
+// assertOffsets checks the splice offsets recorded in idx.
+func assertOffsets(t *testing.T, idx *Index, offsets []int64) {
+	t.Helper()
+	if len(offsets) != len(idx.Entries) {
+		t.Fatalf("fixture lists %d offsets for %d entries", len(offsets), len(idx.Entries))
+	}
+	for i, e := range idx.Entries {
+		if e.Offset != offsets[i] {
+			t.Errorf("entry %d: offset %d, want %d", i, e.Offset, offsets[i])
+		}
+	}
+}
+
+func TestRoundTripFixtures(t *testing.T) {
+	for _, fx := range archiveFixtures() {
 		t.Run(fx.name, func(t *testing.T) {
 			composed, dir, idx := roundTrip(t, fx.archive)
 			assertIdentical(t, fx.archive, composed)
 			assertBlobs(t, dir, idx, fx.names, fx.contents)
-			if len(fx.offsets) != len(idx.Entries) {
-				t.Fatalf("fixture lists %d offsets for %d entries", len(fx.offsets), len(idx.Entries))
-			}
-			for i, e := range idx.Entries {
-				if e.Offset != fx.offsets[i] {
-					t.Errorf("entry %d: offset %d, want %d", i, e.Offset, fx.offsets[i])
-				}
-			}
+			assertOffsets(t, idx, fx.offsets)
 		})
 	}
 }
@@ -195,6 +212,11 @@ func TestDecomposeErrors(t *testing.T) {
 			err := Decompose(bytes.NewReader(tc.archive), dir)
 			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 				t.Fatalf("error = %v, want containing %q", err, tc.wantErr)
+			}
+			// The same archive must fail the same way through a memory sink.
+			err = DecomposeTo(bytes.NewReader(tc.archive), newMemSink())
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("memory sink: error = %v, want containing %q", err, tc.wantErr)
 			}
 		})
 	}

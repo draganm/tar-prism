@@ -5,13 +5,16 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 )
 
 // roundTrip decomposes archive into a fresh prism directory and composes it
-// back, returning the composed bytes, the prism directory, and its index.
+// back, returning the composed bytes, the prism directory, and its index. It
+// also runs the archive through a memory sink and source and checks that
+// both paths agree on the output and the index.
 func roundTrip(t *testing.T, archive []byte) ([]byte, string, *Index) {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "prism")
@@ -25,6 +28,11 @@ func roundTrip(t *testing.T, archive []byte) ([]byte, string, *Index) {
 	var out bytes.Buffer
 	if err := Compose(dir, &out); err != nil {
 		t.Fatalf("Compose: %v", err)
+	}
+	memOut, mem := memoryRoundTrip(t, archive)
+	assertIdentical(t, out.Bytes(), memOut)
+	if !reflect.DeepEqual(mem.index, idx) {
+		t.Fatalf("memory index %+v differs from directory index %+v", mem.index, idx)
 	}
 	return out.Bytes(), dir, idx
 }
@@ -43,8 +51,18 @@ func assertIdentical(t *testing.T, want, got []byte) {
 }
 
 // assertBlobs checks that the index lists exactly the given names, in order,
-// and that each blob holds the corresponding content.
+// and that each blob file in dir holds the corresponding content.
 func assertBlobs(t *testing.T, dir string, idx *Index, names []string, contents [][]byte) {
+	t.Helper()
+	assertEntries(t, idx, names, contents, func(e Entry) ([]byte, error) {
+		return os.ReadFile(filepath.Join(dir, filepath.FromSlash(e.Blob)))
+	})
+}
+
+// assertEntries checks that the index lists exactly the given names, in
+// order, and that each blob, fetched with read, holds the corresponding
+// content.
+func assertEntries(t *testing.T, idx *Index, names []string, contents [][]byte, read func(Entry) ([]byte, error)) {
 	t.Helper()
 	if len(idx.Entries) != len(names) {
 		t.Fatalf("index has %d entries, want %d: %+v", len(idx.Entries), len(names), idx.Entries)
@@ -56,7 +74,7 @@ func assertBlobs(t *testing.T, dir string, idx *Index, names []string, contents 
 		if e.Blob != blobName(i+1) {
 			t.Errorf("entry %d: blob %q, want %q", i, e.Blob, blobName(i+1))
 		}
-		got, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(e.Blob)))
+		got, err := read(e)
 		if err != nil {
 			t.Fatalf("entry %d: %v", i, err)
 		}
@@ -111,14 +129,26 @@ func randomBytes(n int) []byte {
 	return b
 }
 
-func TestRoundTripGenerated(t *testing.T) {
+// generatedFiles returns the file set that needs PAX records or GNU
+// long-name entries: everything in commonFiles plus a deep path, a long link
+// target, and a file after them.
+func generatedFiles(t *testing.T) []testFile {
+	t.Helper()
+	deepName := strings.Repeat("d/", 140) + "leaf.txt" // > 255 bytes: needs PAX path or GNU 'L'
+	longLink := strings.Repeat("t", 150)               // > 100 bytes: needs PAX linkpath or GNU 'K'
+	return append(commonFiles(),
+		testFile{hdr: tar.Header{Name: deepName, Typeflag: tar.TypeReg}, body: []byte("deep\n")},
+		testFile{hdr: tar.Header{Name: "longlink", Typeflag: tar.TypeSymlink, Linkname: longLink}},
+		testFile{hdr: tar.Header{Name: "after.txt", Typeflag: tar.TypeReg}, body: []byte("after\n")},
+	)
+}
+
+// commonFiles returns a file set that fits every format, including ustar's
+// prefix/name split.
+func commonFiles() []testFile {
 	big := randomBytes(3<<20 + 17)
 	prefixName := strings.Repeat("d", 120) + "/file.txt" // needs the ustar prefix field
-	deepName := strings.Repeat("d/", 140) + "leaf.txt"   // > 255 bytes: needs PAX path or GNU 'L'
-	longLink := strings.Repeat("t", 150)                 // > 100 bytes: needs PAX linkpath or GNU 'K'
-
-	// Fits every format, including ustar's prefix/name split.
-	common := []testFile{
+	return []testFile{
 		{hdr: tar.Header{Name: "a.txt", Typeflag: tar.TypeReg}, body: []byte("hello\n")},
 		{hdr: tar.Header{Name: "empty.txt", Typeflag: tar.TypeReg}},
 		{hdr: tar.Header{Name: "dir/", Typeflag: tar.TypeDir, Mode: 0o755}},
@@ -129,13 +159,21 @@ func TestRoundTripGenerated(t *testing.T) {
 		{hdr: tar.Header{Name: "big.bin", Typeflag: tar.TypeReg}, body: big},
 		{hdr: tar.Header{Name: "fifo", Typeflag: tar.TypeFifo}},
 	}
-	// Needs PAX records or GNU long-name entries.
-	extended := append(append([]testFile{}, common...),
-		testFile{hdr: tar.Header{Name: deepName, Typeflag: tar.TypeReg}, body: []byte("deep\n")},
-		testFile{hdr: tar.Header{Name: "longlink", Typeflag: tar.TypeSymlink, Linkname: longLink}},
-		testFile{hdr: tar.Header{Name: "after.txt", Typeflag: tar.TypeReg}, body: []byte("after\n")},
-	)
+}
 
+// generatedArchive is an archive written by archive/tar with the regular
+// files it must yield.
+type generatedArchive struct {
+	name     string
+	archive  []byte
+	names    []string
+	contents [][]byte
+}
+
+// generatedArchives returns archive/tar output in ustar, PAX and GNU format,
+// each also padded to a 10240-byte record boundary.
+func generatedArchives(t *testing.T) []generatedArchive {
+	t.Helper()
 	regularFiles := func(files []testFile) (names []string, bodies [][]byte) {
 		for _, f := range files {
 			if f.hdr.Typeflag == tar.TypeReg {
@@ -145,29 +183,34 @@ func TestRoundTripGenerated(t *testing.T) {
 		}
 		return names, bodies
 	}
-
 	cases := []struct {
 		name   string
 		format tar.Format
 		files  []testFile
 	}{
-		{"ustar", tar.FormatUSTAR, common},
-		{"pax", tar.FormatPAX, extended},
-		{"gnu", tar.FormatGNU, extended},
+		{"ustar", tar.FormatUSTAR, commonFiles()},
+		{"pax", tar.FormatPAX, generatedFiles(t)},
+		{"gnu", tar.FormatGNU, generatedFiles(t)},
 	}
+	var out []generatedArchive
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			archive := buildTar(t, tc.format, tc.files)
-			composed, dir, idx := roundTrip(t, archive)
-			assertIdentical(t, archive, composed)
-			names, bodies := regularFiles(tc.files)
-			assertBlobs(t, dir, idx, names, bodies)
-		})
-		t.Run(tc.name+"/record-padded", func(t *testing.T) {
-			archive := buildTar(t, tc.format, tc.files)
-			padded := append(archive, make([]byte, 10240-len(archive)%10240)...)
-			composed, _, _ := roundTrip(t, padded)
-			assertIdentical(t, padded, composed)
+		archive := buildTar(t, tc.format, tc.files)
+		names, bodies := regularFiles(tc.files)
+		padded := append(append([]byte{}, archive...), make([]byte, 10240-len(archive)%10240)...)
+		out = append(out,
+			generatedArchive{name: tc.name, archive: archive, names: names, contents: bodies},
+			generatedArchive{name: tc.name + "/record-padded", archive: padded, names: names, contents: bodies},
+		)
+	}
+	return out
+}
+
+func TestRoundTripGenerated(t *testing.T) {
+	for _, g := range generatedArchives(t) {
+		t.Run(g.name, func(t *testing.T) {
+			composed, dir, idx := roundTrip(t, g.archive)
+			assertIdentical(t, g.archive, composed)
+			assertBlobs(t, dir, idx, g.names, g.contents)
 		})
 	}
 }

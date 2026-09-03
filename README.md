@@ -45,6 +45,44 @@ err  = tarprism.Compose("prism", writer)     // prism directory in, identical ta
 idx, err := tarprism.ReadIndex("prism")      // inspect recipe.json
 ```
 
+### Sinks and sources
+
+The directory functions are adapters over a streaming API, so the parts of a
+prism can go anywhere: a content-addressed store, an object store, memory.
+
+```go
+// Sink receives the parts of a decomposed archive: Recipe once, then Blob
+// once per regular file in archive order, then Index once at the end.
+type Sink interface {
+    Recipe() (io.WriteCloser, error)
+    Blob(index int, entry Entry, r io.Reader) error // must consume exactly entry.Size bytes
+    Index(idx *Index) error
+}
+
+// Source serves the parts of a prism to ComposeFrom.
+type Source interface {
+    Index() (*Index, error)
+    Recipe() (io.ReadCloser, error)
+    Blob(index int, entry Entry) (io.ReadCloser, error) // must yield exactly entry.Size bytes
+}
+
+err := tarprism.DecomposeTo(reader, sink)    // tar in, parts to the sink
+err  = tarprism.ComposeFrom(source, writer)  // parts from the source, identical tar out
+
+sink := tarprism.DirSink("prism")            // the adapters behind Decompose and Compose
+src  := tarprism.DirSource("prism")
+
+data, err := tarprism.EncodeIndex(idx)       // recipe.json bytes, as Decompose writes them
+idx, err   = tarprism.DecodeIndex(data)      // parse and validate recipe.json bytes
+```
+
+`index` is 0-based and matches `Index.Entries[index]`; `entry.Blob` carries
+the `blobs/%08d` name a prism directory would use, so directory and other
+sinks agree on naming. `DecomposeTo` closes the recipe writer after the last
+recipe byte, before calling `Index`, and also when decomposition fails.
+`ComposeFrom` closes every reader it receives and fails if a blob reader ends
+before `entry.Size` bytes or has more.
+
 ## Development
 
 ```
@@ -54,7 +92,8 @@ go test ./...
 
 The tests round-trip archives written by Go's `archive/tar`, by GNU tar and
 bsdtar when available, and hand-built block sequences covering GNU sparse
-entries, PAX size overrides, bogus hard-link sizes, and truncated input.
+entries, PAX size overrides, bogus hard-link sizes, and truncated input, each
+through the directory adapters and through an in-memory sink and source.
 
 ## License
 

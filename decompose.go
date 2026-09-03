@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -24,62 +22,53 @@ const bufSize = 1 << 20
 // Decompose reads an uncompressed tar archive from r and writes a prism into
 // dir: recipe.bin, recipe.json, and blobs/. dir must not exist or must be
 // empty. On error the partially written directory is left in place.
+//
+// It is DecomposeTo(r, DirSink(dir)).
 func Decompose(r io.Reader, dir string) error {
-	if err := prepareDir(dir); err != nil {
+	return DecomposeTo(r, DirSink(dir))
+}
+
+// DecomposeTo reads an uncompressed tar archive from r and hands its parts to
+// sink: the recipe as a stream, each regular file's content as it is reached,
+// and the index last. The recipe writer is closed before Index is called, and
+// also when decomposition fails; on failure Index is not called and whatever
+// the sink already received is not a valid prism.
+func DecomposeTo(r io.Reader, sink Sink) error {
+	recipe, err := sink.Recipe()
+	if err != nil {
 		return err
 	}
-	recipeFile, err := os.Create(filepath.Join(dir, RecipeFile))
-	if err != nil {
-		return fmt.Errorf("creating recipe: %w", err)
-	}
-	defer recipeFile.Close()
-
 	hasher := blake3.New(32, nil)
 	d := &decomposer{
 		in:      bufio.NewReaderSize(io.TeeReader(r, hasher), bufSize),
-		recipe:  bufio.NewWriterSize(recipeFile, bufSize),
-		dir:     dir,
+		recipe:  bufio.NewWriterSize(recipe, bufSize),
+		sink:    sink,
 		entries: []Entry{},
 	}
 	if err := d.run(); err != nil {
+		recipe.Close()
 		return err
 	}
 	if err := d.recipe.Flush(); err != nil {
+		recipe.Close()
 		return fmt.Errorf("writing recipe: %w", err)
 	}
-	if err := recipeFile.Close(); err != nil {
-		return fmt.Errorf("writing recipe: %w", err)
+	if err := recipe.Close(); err != nil {
+		return fmt.Errorf("closing recipe: %w", err)
 	}
-	return writeIndex(dir, &Index{
+	return sink.Index(&Index{
 		Version: FormatVersion,
 		BLAKE3:  hex.EncodeToString(hasher.Sum(nil)),
 		Entries: d.entries,
 	})
 }
 
-// prepareDir creates dir and its blobs subdirectory. dir may already exist
-// only if it is empty.
-func prepareDir(dir string) error {
-	existing, err := os.ReadDir(dir)
-	switch {
-	case errors.Is(err, os.ErrNotExist):
-	case err != nil:
-		return fmt.Errorf("checking %s: %w", dir, err)
-	case len(existing) > 0:
-		return fmt.Errorf("%s exists and is not empty", dir)
-	}
-	if err := os.MkdirAll(filepath.Join(dir, BlobsDir), 0o755); err != nil {
-		return fmt.Errorf("creating %s: %w", dir, err)
-	}
-	return nil
-}
-
 // decomposer walks the archive block by block, sending regular-file content
-// to blobs and everything else to the recipe.
+// to the sink's blobs and everything else to the recipe.
 type decomposer struct {
 	in      *bufio.Reader
 	recipe  *bufio.Writer
-	dir     string
+	sink    Sink
 	inPos   int64 // bytes consumed from the archive, for error messages
 	outPos  int64 // bytes written to the recipe
 	entries []Entry
@@ -240,29 +229,52 @@ func (d *decomposer) nextIsHeader() bool {
 	return isZeroBlock(b) || checksumOK(b)
 }
 
-// extract streams size bytes of file content into a new blob, records the
-// index entry, and copies the block padding to the recipe.
+// extract hands size bytes of file content to the sink as a new blob, records
+// the index entry, and copies the block padding to the recipe.
 func (d *decomposer) extract(name string, size int64, hdrPos int64) error {
-	rel := blobName(len(d.entries) + 1)
-	f, err := os.Create(filepath.Join(d.dir, filepath.FromSlash(rel)))
-	if err != nil {
-		return fmt.Errorf("creating blob: %w", err)
+	i := len(d.entries)
+	entry := Entry{Name: name, Offset: d.outPos, Size: size, Blob: blobName(i + 1)}
+	br := &blobReader{r: d.in, remaining: size}
+	err := d.sink.Blob(i, entry, br)
+	d.inPos += br.n
+	switch {
+	case br.err != nil && !errors.Is(br.err, io.EOF):
+		return fmt.Errorf("offset %d: entry %q: reading content: %w", hdrPos, name, br.err)
+	case br.n < size && br.err != nil:
+		return fmt.Errorf("offset %d: entry %q: truncated content (%d of %d bytes)", hdrPos, name, br.n, size)
+	case err != nil:
+		return fmt.Errorf("offset %d: entry %q: sink: %w", hdrPos, name, err)
+	case br.n < size:
+		return fmt.Errorf("offset %d: entry %q: sink consumed %d of %d bytes", hdrPos, name, br.n, size)
 	}
-	offset := d.outPos
-	n, err := io.CopyN(f, d.in, size)
-	d.inPos += n
-	if err != nil {
-		f.Close()
-		if errors.Is(err, io.EOF) {
-			return fmt.Errorf("offset %d: entry %q: truncated content (%d of %d bytes)", hdrPos, name, n, size)
-		}
-		return fmt.Errorf("writing blob %s: %w", rel, err)
-	}
-	if err := f.Close(); err != nil {
-		return fmt.Errorf("writing blob %s: %w", rel, err)
-	}
-	d.entries = append(d.entries, Entry{Name: name, Offset: offset, Size: size, Blob: rel})
+	d.entries = append(d.entries, entry)
 	return d.copyRecipe(padding(size), hdrPos)
+}
+
+// blobReader hands a sink exactly the content bytes of one entry. It counts
+// what the sink consumed and remembers how the archive reader ended so that
+// extract can tell a lazy sink from a truncated archive.
+type blobReader struct {
+	r         io.Reader
+	remaining int64
+	n         int64 // bytes handed to the sink
+	err       error // first error from r, io.EOF included
+}
+
+func (b *blobReader) Read(p []byte) (int, error) {
+	if b.remaining <= 0 {
+		return 0, io.EOF
+	}
+	if int64(len(p)) > b.remaining {
+		p = p[:b.remaining]
+	}
+	n, err := b.r.Read(p)
+	b.n += int64(n)
+	b.remaining -= int64(n)
+	if err != nil && b.err == nil {
+		b.err = err
+	}
+	return n, err
 }
 
 // readMeta reads a small meta-entry payload into memory, writing it and its

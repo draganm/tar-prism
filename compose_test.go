@@ -52,7 +52,8 @@ func TestComposeErrors(t *testing.T) {
 		wantErr string
 	}{
 		{"missing blob", func(t *testing.T, dir string) { must(t, os.Remove(blob(dir, 2))) }, "no such file"},
-		{"blob size mismatch", func(t *testing.T, dir string) { must(t, os.WriteFile(blob(dir, 1), []byte("abcd"), 0o644)) }, "is 4 bytes, index says 3"},
+		{"long blob", func(t *testing.T, dir string) { must(t, os.WriteFile(blob(dir, 1), []byte("abcd"), 0o644)) }, "blob blobs/00000001 is longer than the 3 bytes"},
+		{"short blob", func(t *testing.T, dir string) { must(t, os.WriteFile(blob(dir, 1), []byte("ab"), 0o644)) }, "blob blobs/00000001 ends after 2 of 3 bytes"},
 		{"tampered blob", func(t *testing.T, dir string) { must(t, os.WriteFile(blob(dir, 1), []byte("xyz"), 0o644)) }, "digest"},
 		{"tampered recipe", func(t *testing.T, dir string) {
 			f, err := os.OpenFile(filepath.Join(dir, RecipeFile), os.O_WRONLY, 0)
