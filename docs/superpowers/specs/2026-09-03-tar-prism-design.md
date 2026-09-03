@@ -1,11 +1,11 @@
-# tar-prysm design
+# tar-prism design
 
 Date: 2026-09-03
 Status: approved
 
 ## Purpose
 
-`tar-prysm` splits an uncompressed tar archive into two parts:
+`tar-prism` splits an uncompressed tar archive into two parts:
 
 - a **recipe**: every byte of the archive that is not regular-file content
   (headers, PAX and GNU meta entries, block padding, the end-of-archive
@@ -16,8 +16,8 @@ Together these form a **prysm** directory. Composing a prysm yields a tar that
 is byte-for-byte identical to the original, and the tool verifies this with a
 BLAKE3 hash recorded at decompose time.
 
-It ships as a Go library (root package `tarprysm`) and a CLI
-(`cmd/tar-prysm`, built on `github.com/urfave/cli/v2`).
+It ships as a Go library (root package `tarprism`) and a CLI
+(`cmd/tar-prism`, built on `github.com/urfave/cli/v2`).
 
 ## Non-goals
 
@@ -160,7 +160,7 @@ Parser-free. Steps:
 ## Library API
 
 ```go
-package tarprysm
+package tarprism
 
 const (
     RecipeFile = "recipe.bin"
@@ -199,8 +199,8 @@ archive, which entry) using `%w`.
 ## CLI
 
 ```
-tar-prysm decompose <input.tar|-> <prysm-dir>
-tar-prysm compose   <prysm-dir> <output.tar|->
+tar-prism decompose <input.tar|-> <prysm-dir>
+tar-prism compose   <prysm-dir> <output.tar|->
 ```
 
 - `-` means stdin for input and stdout for output.
@@ -215,11 +215,11 @@ tar-prysm compose   <prysm-dir> <output.tar|->
 ## Code layout
 
 ```
-tarprysm.go       constants, Index/Entry, ReadIndex
+tarprism.go       constants, Index/Entry, ReadIndex
 header.go         block parsing: checksum, numeric fields, typeflag, name, PAX records
 decompose.go      Decompose
 compose.go        Compose
-cmd/tar-prysm/
+cmd/tar-prism/
   main.go         urfave/cli/v2 app wiring
 ```
 

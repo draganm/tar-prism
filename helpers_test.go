@@ -1,4 +1,4 @@
-package tarprysm
+package tarprism
 
 // payload pads data to a whole number of blocks, as it appears in an archive.
 func payload(data []byte) []byte {

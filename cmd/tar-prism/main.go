@@ -1,4 +1,4 @@
-// Command tar-prysm splits a tar archive into a recipe and content blobs, and
+// Command tar-prism splits a tar archive into a recipe and content blobs, and
 // reassembles the byte-identical archive from them.
 package main
 
@@ -8,20 +8,20 @@ import (
 	"io"
 	"os"
 
-	tarprysm "github.com/draganm/tar-prysm"
+	tarprism "github.com/draganm/tar-prism"
 	"github.com/urfave/cli/v2"
 )
 
 func main() {
 	if err := newApp(os.Stdin, os.Stdout).Run(os.Args); err != nil {
-		fmt.Fprintln(os.Stderr, "tar-prysm:", err)
+		fmt.Fprintln(os.Stderr, "tar-prism:", err)
 		os.Exit(1)
 	}
 }
 
 func newApp(stdin io.Reader, stdout io.Writer) *cli.App {
 	return &cli.App{
-		Name:   "tar-prysm",
+		Name:   "tar-prism",
 		Usage:  "split a tar into a recipe and blobs, and put it back together byte for byte",
 		Writer: stdout,
 		Commands: []*cli.Command{
@@ -31,7 +31,7 @@ func newApp(stdin io.Reader, stdout io.Writer) *cli.App {
 				ArgsUsage: "<input.tar|-> <prysm-dir>",
 				Action: func(c *cli.Context) error {
 					if c.NArg() != 2 {
-						return errors.New("usage: tar-prysm decompose <input.tar|-> <prysm-dir>")
+						return errors.New("usage: tar-prism decompose <input.tar|-> <prysm-dir>")
 					}
 					return decompose(stdin, c.Args().Get(0), c.Args().Get(1))
 				},
@@ -42,7 +42,7 @@ func newApp(stdin io.Reader, stdout io.Writer) *cli.App {
 				ArgsUsage: "<prysm-dir> <output.tar|->",
 				Action: func(c *cli.Context) error {
 					if c.NArg() != 2 {
-						return errors.New("usage: tar-prysm compose <prysm-dir> <output.tar|->")
+						return errors.New("usage: tar-prism compose <prysm-dir> <output.tar|->")
 					}
 					return compose(stdout, c.Args().Get(0), c.Args().Get(1))
 				},
@@ -65,7 +65,7 @@ func decompose(stdin io.Reader, input, dir string) error {
 	}
 	_, statErr := os.Stat(dir)
 	created := errors.Is(statErr, os.ErrNotExist)
-	if err := tarprysm.Decompose(in, dir); err != nil {
+	if err := tarprism.Decompose(in, dir); err != nil {
 		if created {
 			os.RemoveAll(dir)
 		}
@@ -78,13 +78,13 @@ func decompose(stdin io.Reader, input, dir string) error {
 // an existing file.
 func compose(stdout io.Writer, dir, output string) error {
 	if output == "-" {
-		return tarprysm.Compose(dir, stdout)
+		return tarprism.Compose(dir, stdout)
 	}
 	f, err := os.Create(output)
 	if err != nil {
 		return err
 	}
-	if err := tarprysm.Compose(dir, f); err != nil {
+	if err := tarprism.Compose(dir, f); err != nil {
 		f.Close()
 		return err
 	}

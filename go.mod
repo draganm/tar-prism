@@ -1,4 +1,4 @@
-module github.com/draganm/tar-prysm
+module github.com/draganm/tar-prism
 
 go 1.26.6
 

@@ -1,4 +1,4 @@
-# tar-prysm
+# tar-prism
 
 Splits an uncompressed tar archive into two parts and puts it back together
 byte for byte:
@@ -25,8 +25,8 @@ result against the recorded BLAKE3 digest.
 ## CLI
 
 ```
-tar-prysm decompose <input.tar|-> <prysm-dir>
-tar-prysm compose   <prysm-dir> <output.tar|->
+tar-prism decompose <input.tar|-> <prysm-dir>
+tar-prism compose   <prysm-dir> <output.tar|->
 ```
 
 `-` reads the archive from stdin or writes it to stdout. `decompose` refuses a
@@ -38,11 +38,11 @@ supported; decompress `.tar.gz` and friends first.
 ## Library
 
 ```go
-import tarprysm "github.com/draganm/tar-prysm"
+import tarprism "github.com/draganm/tar-prism"
 
-err := tarprysm.Decompose(reader, "prysm")   // tar in, prysm directory out
-err  = tarprysm.Compose("prysm", writer)     // prysm directory in, identical tar out
-idx, err := tarprysm.ReadIndex("prysm")      // inspect recipe.json
+err := tarprism.Decompose(reader, "prysm")   // tar in, prysm directory out
+err  = tarprism.Compose("prysm", writer)     // prysm directory in, identical tar out
+idx, err := tarprism.ReadIndex("prysm")      // inspect recipe.json
 ```
 
 ## Development

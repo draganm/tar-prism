@@ -1,7 +1,7 @@
-// Package tarprysm splits an uncompressed tar archive into a recipe (every
+// Package tarprism splits an uncompressed tar archive into a recipe (every
 // byte that is not regular-file content, kept verbatim) and numbered blobs
 // (the file contents), and reassembles the byte-identical archive from them.
-package tarprysm
+package tarprism
 
 import (
 	"encoding/hex"

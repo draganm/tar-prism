@@ -30,7 +30,7 @@ func sampleTar(t *testing.T) []byte {
 func run(t *testing.T, stdin []byte, args ...string) ([]byte, error) {
 	t.Helper()
 	var out bytes.Buffer
-	err := newApp(bytes.NewReader(stdin), &out).Run(append([]string{"tar-prysm"}, args...))
+	err := newApp(bytes.NewReader(stdin), &out).Run(append([]string{"tar-prism"}, args...))
 	return out.Bytes(), err
 }
 

@@ -1,4 +1,4 @@
-package tarprysm
+package tarprism
 
 import (
 	"archive/tar"
