@@ -55,3 +55,8 @@ go test ./...
 The tests round-trip archives written by Go's `archive/tar`, by GNU tar and
 bsdtar when available, and hand-built block sequences covering GNU sparse
 entries, PAX size overrides, bogus hard-link sizes, and truncated input.
+
+## License
+
+tar-prism is licensed under the GNU Affero General Public License, version 3
+or later; see `LICENSE`.
