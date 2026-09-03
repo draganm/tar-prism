@@ -3,6 +3,8 @@ package tarprysm
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -11,6 +13,17 @@ import (
 
 	"lukechampine.com/blake3"
 )
+
+// errBoom is a sentinel non-EOF read error used to prove that decompose
+// wraps genuine I/O failures instead of mislabelling them as truncation.
+var errBoom = errors.New("boom")
+
+// errReader always fails with errBoom.
+type errReader struct{}
+
+func (errReader) Read(p []byte) (int, error) {
+	return 0, errBoom
+}
 
 func TestDecomposeSingleFile(t *testing.T) {
 	hdr := rawHeader{name: "a.txt", typeflag: '0', size: 5, magic: "ustar\x0000"}.block()
@@ -66,6 +79,22 @@ func TestDecomposeEmptyFileGetsBlob(t *testing.T) {
 	}
 	if info, err := os.Stat(filepath.Join(dir, BlobsDir, "00000001")); err != nil || info.Size() != 0 {
 		t.Fatalf("empty blob: %v, %v", info, err)
+	}
+}
+
+// TestDecomposeWrapsReadError proves that a genuine I/O failure while
+// reading a meta entry is wrapped with %w rather than reported as
+// "truncated", so it can be found with errors.Is.
+func TestDecomposeWrapsReadError(t *testing.T) {
+	xHeaderBlock := rawHeader{name: "x", typeflag: 'x', size: 10}.block()
+	r := io.MultiReader(bytes.NewReader(xHeaderBlock), errReader{})
+	dir := filepath.Join(t.TempDir(), "prysm")
+	err := Decompose(r, dir)
+	if !errors.Is(err, errBoom) {
+		t.Fatalf("error = %v, want wrapping %v", err, errBoom)
+	}
+	if strings.Contains(err.Error(), "truncated") {
+		t.Fatalf("error = %v, want no false 'truncated' label", err)
 	}
 }
 

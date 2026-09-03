@@ -100,6 +100,9 @@ func parseHeader(b []byte) (header, error) {
 	if size < 0 {
 		return header{}, fmt.Errorf("size field: negative size %d", size)
 	}
+	if size > math.MaxInt64-blockSize {
+		return header{}, fmt.Errorf("size field: size %d too large", size)
+	}
 	h := header{
 		typeflag: b[offType],
 		size:     size,

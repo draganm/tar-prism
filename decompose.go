@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -152,7 +153,7 @@ func (d *decomposer) handle(h header, hdrPos int64) error {
 		}
 		if v, ok := records["size"]; ok {
 			n, err := strconv.ParseInt(v, 10, 64)
-			if err != nil || n < 0 {
+			if err != nil || n < 0 || n > math.MaxInt64-blockSize {
 				return fmt.Errorf("offset %d: invalid pax size %q", hdrPos, v)
 			}
 			d.paxSize, d.hasPAXSize = n, true
@@ -214,7 +215,10 @@ func (d *decomposer) copySparseExtensions(extended bool) error {
 	var blk [blockSize]byte
 	for extended {
 		if _, err := io.ReadFull(d.in, blk[:]); err != nil {
-			return fmt.Errorf("offset %d: truncated sparse extension block", d.inPos)
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				return fmt.Errorf("offset %d: truncated sparse extension block", d.inPos)
+			}
+			return fmt.Errorf("offset %d: reading sparse extension block: %w", d.inPos, err)
 		}
 		d.inPos += blockSize
 		if err := d.writeRecipe(blk[:]); err != nil {
@@ -271,7 +275,10 @@ func (d *decomposer) readMeta(size int64, hdrPos int64) ([]byte, error) {
 	n, err := io.ReadFull(d.in, payload)
 	d.inPos += int64(n)
 	if err != nil {
-		return nil, fmt.Errorf("offset %d: truncated meta entry (%d of %d bytes)", hdrPos, n, size)
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return nil, fmt.Errorf("offset %d: truncated meta entry (%d of %d bytes)", hdrPos, n, size)
+		}
+		return nil, fmt.Errorf("offset %d: reading meta entry: %w", hdrPos, err)
 	}
 	if err := d.writeRecipe(payload); err != nil {
 		return nil, err

@@ -153,6 +153,9 @@ func TestRoundTripFixtures(t *testing.T) {
 			composed, dir, idx := roundTrip(t, fx.archive)
 			assertIdentical(t, fx.archive, composed)
 			assertBlobs(t, dir, idx, fx.names, fx.contents)
+			if len(fx.offsets) != len(idx.Entries) {
+				t.Fatalf("fixture lists %d offsets for %d entries", len(fx.offsets), len(idx.Entries))
+			}
 			for i, e := range idx.Entries {
 				if e.Offset != fx.offsets[i] {
 					t.Errorf("entry %d: offset %d, want %d", i, e.Offset, fx.offsets[i])
@@ -183,6 +186,8 @@ func TestDecomposeErrors(t *testing.T) {
 		{"truncated meta entry", concat(rawHeader{name: "x", typeflag: 'x', size: 10}.block(), []byte("10 si")), "truncated meta entry"},
 		{"oversized meta entry", rawHeader{name: "x", typeflag: 'x', size: maxMetaSize + 1}.block(), "exceeds"},
 		{"truncated sparse extension", rawHeader{name: "s", typeflag: 'S', size: 0, magic: "ustar  \x00", patch: func(b []byte) { b[offGNUIsExtended] = 1 }}.block(), "sparse extension"},
+		{"size field would overflow size+padding", concat(rawHeader{name: "weird", typeflag: 'Z', sizeField: []byte{0x80, 0x00, 0x00, 0x00, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}}.block(), endMarker), "size field"},
+		{"pax size would overflow size+padding", concat(rawHeader{name: "x", typeflag: 'x', size: 28}.block(), payload([]byte("28 size=9223372036854775807\n")), regB, payload([]byte("abc")), endMarker), "invalid pax size"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

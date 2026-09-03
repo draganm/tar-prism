@@ -30,9 +30,10 @@ tar-prysm compose   <prysm-dir> <output.tar|->
 ```
 
 `-` reads the archive from stdin or writes it to stdout. `decompose` refuses a
-non-empty target directory. `compose` overwrites an existing output file.
-Only uncompressed archives are supported; decompress `.tar.gz` and friends
-first.
+non-empty target directory. `compose` overwrites an existing output file. If
+`compose` fails, the output file may be partial or unverified; trust it only
+when the command exits with status 0. Only uncompressed archives are
+supported; decompress `.tar.gz` and friends first.
 
 ## Library
 
