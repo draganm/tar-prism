@@ -10,11 +10,11 @@ import (
 	"time"
 )
 
-// roundTrip decomposes archive into a fresh prysm directory and composes it
-// back, returning the composed bytes, the prysm directory, and its index.
+// roundTrip decomposes archive into a fresh prism directory and composes it
+// back, returning the composed bytes, the prism directory, and its index.
 func roundTrip(t *testing.T, archive []byte) ([]byte, string, *Index) {
 	t.Helper()
-	dir := filepath.Join(t.TempDir(), "prysm")
+	dir := filepath.Join(t.TempDir(), "prism")
 	if err := Decompose(bytes.NewReader(archive), dir); err != nil {
 		t.Fatalf("Decompose: %v", err)
 	}

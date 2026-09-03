@@ -191,7 +191,7 @@ func TestDecomposeErrors(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			dir := filepath.Join(t.TempDir(), "prysm")
+			dir := filepath.Join(t.TempDir(), "prism")
 			err := Decompose(bytes.NewReader(tc.archive), dir)
 			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 				t.Fatalf("error = %v, want containing %q", err, tc.wantErr)

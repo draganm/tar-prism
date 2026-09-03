@@ -12,7 +12,7 @@ Status: approved
   marker, record padding, and any trailing bytes), kept verbatim and in order;
 - **blobs**: the content of each regular file, one file per entry.
 
-Together these form a **prysm** directory. Composing a prysm yields a tar that
+Together these form a **prism** directory. Composing a prism yields a tar that
 is byte-for-byte identical to the original, and the tool verifies this with a
 BLAKE3 hash recorded at decompose time.
 
@@ -29,10 +29,10 @@ It ships as a Go library (root package `tarprism`) and a CLI
 - Interpreting archive semantics (extracting files, resolving links, applying
   permissions). The tool only needs to know where file content starts and ends.
 
-## Prysm directory format
+## Prism directory format
 
 ```
-<prysm>/
+<prism>/
   recipe.bin        non-content bytes of the tar, verbatim, in order
   recipe.json       index (schema below)
   blobs/00000001    content of the 1st regular file in tar order
@@ -62,11 +62,11 @@ Nth regular file in the archive.
   - `offset`: byte position in `recipe.bin` at which the blob content is
     spliced in when composing. Offsets are strictly increasing.
   - `size`: content length in bytes. Must equal the blob file size.
-  - `blob`: path of the blob relative to the prysm directory.
+  - `blob`: path of the blob relative to the prism directory.
   - `name`: entry name for human readers, best effort (see below). Never used
     for reconstruction. May be lossy for non-UTF-8 names.
 
-`recipe.json` is written last, so a prysm interrupted mid-decompose has no
+`recipe.json` is written last, so a prism interrupted mid-decompose has no
 index and compose fails with a clear error.
 
 ## Decompose
@@ -168,11 +168,11 @@ const (
     BlobsDir   = "blobs"
 )
 
-// Decompose reads an uncompressed tar from r and writes a prysm into dir.
+// Decompose reads an uncompressed tar from r and writes a prism into dir.
 // dir must not exist or must be empty.
 func Decompose(r io.Reader, dir string) error
 
-// Compose reads the prysm in dir and writes the original tar to w, verifying
+// Compose reads the prism in dir and writes the original tar to w, verifying
 // the result against the recorded BLAKE3 digest.
 func Compose(dir string, w io.Writer) error
 
@@ -199,8 +199,8 @@ archive, which entry) using `%w`.
 ## CLI
 
 ```
-tar-prism decompose <input.tar|-> <prysm-dir>
-tar-prism compose   <prysm-dir> <output.tar|->
+tar-prism decompose <input.tar|-> <prism-dir>
+tar-prism compose   <prism-dir> <output.tar|->
 ```
 
 - `-` means stdin for input and stdout for output.

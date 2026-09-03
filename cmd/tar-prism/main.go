@@ -27,22 +27,22 @@ func newApp(stdin io.Reader, stdout io.Writer) *cli.App {
 		Commands: []*cli.Command{
 			{
 				Name:      "decompose",
-				Usage:     "split an uncompressed tar archive into a prysm directory",
-				ArgsUsage: "<input.tar|-> <prysm-dir>",
+				Usage:     "split an uncompressed tar archive into a prism directory",
+				ArgsUsage: "<input.tar|-> <prism-dir>",
 				Action: func(c *cli.Context) error {
 					if c.NArg() != 2 {
-						return errors.New("usage: tar-prism decompose <input.tar|-> <prysm-dir>")
+						return errors.New("usage: tar-prism decompose <input.tar|-> <prism-dir>")
 					}
 					return decompose(stdin, c.Args().Get(0), c.Args().Get(1))
 				},
 			},
 			{
 				Name:      "compose",
-				Usage:     "rebuild the original tar archive from a prysm directory",
-				ArgsUsage: "<prysm-dir> <output.tar|->",
+				Usage:     "rebuild the original tar archive from a prism directory",
+				ArgsUsage: "<prism-dir> <output.tar|->",
 				Action: func(c *cli.Context) error {
 					if c.NArg() != 2 {
-						return errors.New("usage: tar-prism compose <prysm-dir> <output.tar|->")
+						return errors.New("usage: tar-prism compose <prism-dir> <output.tar|->")
 					}
 					return compose(stdout, c.Args().Get(0), c.Args().Get(1))
 				},

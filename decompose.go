@@ -21,7 +21,7 @@ const maxMetaSize = 256 << 20
 
 const bufSize = 1 << 20
 
-// Decompose reads an uncompressed tar archive from r and writes a prysm into
+// Decompose reads an uncompressed tar archive from r and writes a prism into
 // dir: recipe.bin, recipe.json, and blobs/. dir must not exist or must be
 // empty. On error the partially written directory is left in place.
 func Decompose(r io.Reader, dir string) error {

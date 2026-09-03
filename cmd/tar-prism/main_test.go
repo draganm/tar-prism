@@ -41,7 +41,7 @@ func TestFileRoundTrip(t *testing.T) {
 	if err := os.WriteFile(in, archive, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(tmp, "prysm")
+	dir := filepath.Join(tmp, "prism")
 	out := filepath.Join(tmp, "out.tar")
 	if _, err := run(t, nil, "decompose", in, dir); err != nil {
 		t.Fatalf("decompose: %v", err)
@@ -60,7 +60,7 @@ func TestFileRoundTrip(t *testing.T) {
 
 func TestStdioRoundTrip(t *testing.T) {
 	archive := sampleTar(t)
-	dir := filepath.Join(t.TempDir(), "prysm")
+	dir := filepath.Join(t.TempDir(), "prism")
 	if _, err := run(t, archive, "decompose", "-", dir); err != nil {
 		t.Fatalf("decompose: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestMissingInputs(t *testing.T) {
 	if _, err := run(t, nil, "decompose", filepath.Join(tmp, "nope.tar"), filepath.Join(tmp, "p")); err == nil {
 		t.Error("decompose of a missing file succeeded")
 	}
-	if _, err := run(t, nil, "compose", filepath.Join(tmp, "not-a-prysm"), "-"); err == nil {
+	if _, err := run(t, nil, "compose", filepath.Join(tmp, "not-a-prism"), "-"); err == nil {
 		t.Error("compose of a missing directory succeeded")
 	}
 }

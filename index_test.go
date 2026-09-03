@@ -25,8 +25,8 @@ func TestReadIndex(t *testing.T) {
 		{"wrong version", `{"version":2,"blake3":"` + validDigest + `","entries":[]}`, "unsupported version 2"},
 		{"short digest", `{"version":1,"blake3":"abc","entries":[]}`, "64 hex"},
 		{"non-increasing offset", head + `"entries":[{"offset":512,"size":1,"blob":"blobs/00000001"},{"offset":512,"size":1,"blob":"blobs/00000002"}]}`, "does not increase"},
-		{"escaping blob path", head + `"entries":[{"offset":512,"size":1,"blob":"../x"}]}`, "inside the prysm directory"},
-		{"empty blob path", head + `"entries":[{"offset":512,"size":1,"blob":""}]}`, "inside the prysm directory"},
+		{"escaping blob path", head + `"entries":[{"offset":512,"size":1,"blob":"../x"}]}`, "inside the prism directory"},
+		{"empty blob path", head + `"entries":[{"offset":512,"size":1,"blob":""}]}`, "inside the prism directory"},
 		{"negative size", head + `"entries":[{"offset":512,"size":-1,"blob":"blobs/00000001"}]}`, "negative"},
 		{"not json", `{`, "parsing"},
 	}

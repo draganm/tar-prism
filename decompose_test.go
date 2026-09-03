@@ -28,7 +28,7 @@ func (errReader) Read(p []byte) (int, error) {
 func TestDecomposeSingleFile(t *testing.T) {
 	hdr := rawHeader{name: "a.txt", typeflag: '0', size: 5, magic: "ustar\x0000"}.block()
 	archive := concat(hdr, payload([]byte("hello")), endMarker)
-	dir := filepath.Join(t.TempDir(), "prysm")
+	dir := filepath.Join(t.TempDir(), "prism")
 	if err := Decompose(bytes.NewReader(archive), dir); err != nil {
 		t.Fatalf("Decompose: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestDecomposeSingleFile(t *testing.T) {
 
 func TestDecomposeEmptyFileGetsBlob(t *testing.T) {
 	archive := concat(rawHeader{name: "empty", typeflag: '0', size: 0, magic: "ustar\x0000"}.block(), endMarker)
-	dir := filepath.Join(t.TempDir(), "prysm")
+	dir := filepath.Join(t.TempDir(), "prism")
 	if err := Decompose(bytes.NewReader(archive), dir); err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestDecomposeEmptyFileGetsBlob(t *testing.T) {
 func TestDecomposeWrapsReadError(t *testing.T) {
 	xHeaderBlock := rawHeader{name: "x", typeflag: 'x', size: 10}.block()
 	r := io.MultiReader(bytes.NewReader(xHeaderBlock), errReader{})
-	dir := filepath.Join(t.TempDir(), "prysm")
+	dir := filepath.Join(t.TempDir(), "prism")
 	err := Decompose(r, dir)
 	if !errors.Is(err, errBoom) {
 		t.Fatalf("error = %v, want wrapping %v", err, errBoom)
@@ -126,7 +126,7 @@ func TestDecomposeTargetDir(t *testing.T) {
 		}
 	})
 	t.Run("nested path is created", func(t *testing.T) {
-		dir := filepath.Join(t.TempDir(), "a", "b", "prysm")
+		dir := filepath.Join(t.TempDir(), "a", "b", "prism")
 		if err := Decompose(bytes.NewReader(archive), dir); err != nil {
 			t.Fatal(err)
 		}

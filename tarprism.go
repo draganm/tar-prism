@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 )
 
-// Files and directories that make up a prysm directory.
+// Files and directories that make up a prism directory.
 const (
 	RecipeFile = "recipe.bin"
 	IndexFile  = "recipe.json"
@@ -39,7 +39,7 @@ type Entry struct {
 	Offset int64 `json:"offset"`
 	// Size is the blob's length in bytes.
 	Size int64 `json:"size"`
-	// Blob is the blob's path relative to the prysm directory, slash-separated.
+	// Blob is the blob's path relative to the prism directory, slash-separated.
 	Blob string `json:"blob"`
 }
 
@@ -74,7 +74,7 @@ func (idx *Index) validate() error {
 		case e.Offset <= prev:
 			return fmt.Errorf("entry %d: offset %d does not increase (previous %d)", i, e.Offset, prev)
 		case e.Blob == "" || !filepath.IsLocal(filepath.FromSlash(e.Blob)):
-			return fmt.Errorf("entry %d: blob path %q must be inside the prysm directory", i, e.Blob)
+			return fmt.Errorf("entry %d: blob path %q must be inside the prism directory", i, e.Blob)
 		}
 		prev = e.Offset
 	}

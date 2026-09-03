@@ -12,7 +12,7 @@ import (
 	"lukechampine.com/blake3"
 )
 
-// Compose reads the prysm in dir and writes the original archive to w. The
+// Compose reads the prism in dir and writes the original archive to w. The
 // output is verified against the BLAKE3 digest recorded at decompose time;
 // on a mismatch the (already written) output must not be trusted.
 func Compose(dir string, w io.Writer) error {

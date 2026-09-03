@@ -8,10 +8,10 @@ byte for byte:
   padding. Kept verbatim, in order.
 - **blobs** — the content of each regular file, numbered in archive order.
 
-Together they form a *prysm* directory:
+Together they form a *prism* directory:
 
 ```
-prysm/
+prism/
   recipe.bin        non-content bytes of the archive, verbatim
   recipe.json       splice offsets, sizes, names, and the BLAKE3 digest of the archive
   blobs/00000001    content of the 1st regular file
@@ -19,14 +19,14 @@ prysm/
   ...
 ```
 
-Composing a prysm reproduces the original archive exactly and verifies the
+Composing a prism reproduces the original archive exactly and verifies the
 result against the recorded BLAKE3 digest.
 
 ## CLI
 
 ```
-tar-prism decompose <input.tar|-> <prysm-dir>
-tar-prism compose   <prysm-dir> <output.tar|->
+tar-prism decompose <input.tar|-> <prism-dir>
+tar-prism compose   <prism-dir> <output.tar|->
 ```
 
 `-` reads the archive from stdin or writes it to stdout. `decompose` refuses a
@@ -40,9 +40,9 @@ supported; decompress `.tar.gz` and friends first.
 ```go
 import tarprism "github.com/draganm/tar-prism"
 
-err := tarprism.Decompose(reader, "prysm")   // tar in, prysm directory out
-err  = tarprism.Compose("prysm", writer)     // prysm directory in, identical tar out
-idx, err := tarprism.ReadIndex("prysm")      // inspect recipe.json
+err := tarprism.Decompose(reader, "prism")   // tar in, prism directory out
+err  = tarprism.Compose("prism", writer)     // prism directory in, identical tar out
+idx, err := tarprism.ReadIndex("prism")      // inspect recipe.json
 ```
 
 ## Development

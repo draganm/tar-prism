@@ -19,7 +19,7 @@ func TestComposeErrors(t *testing.T) {
 
 	fresh := func(t *testing.T) string {
 		t.Helper()
-		dir := filepath.Join(t.TempDir(), "prysm")
+		dir := filepath.Join(t.TempDir(), "prism")
 		if err := Decompose(bytes.NewReader(archive), dir); err != nil {
 			t.Fatal(err)
 		}
@@ -83,7 +83,7 @@ func TestComposeErrors(t *testing.T) {
 
 func TestComposeToFile(t *testing.T) {
 	archive := concat(rawHeader{name: "a", typeflag: '0', size: 3, magic: "ustar\x0000"}.block(), payload([]byte("abc")), endMarker)
-	dir := filepath.Join(t.TempDir(), "prysm")
+	dir := filepath.Join(t.TempDir(), "prism")
 	if err := Decompose(bytes.NewReader(archive), dir); err != nil {
 		t.Fatal(err)
 	}
